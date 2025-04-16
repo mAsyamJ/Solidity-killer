@@ -1,6 +1,7 @@
 # CryptoZombies Solidity Certification Journey 🧟‍♂️
 
 This repo documents my learning path through CryptoZombies. Each folder represents a lesson with smart contracts, test cases, and personal notes.
+Just having fun out of uni stuff...
 
 🔗 [CryptoZombies Course](https://cryptozombies.io/en/course/solidity)
 
