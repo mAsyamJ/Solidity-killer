@@ -1,4 +1,6 @@
-## 🧠 High-level summary first:
+## ![Uploading ChatGPT Image 17 Apr 2025, 12.57.25.png…]()
+
+🧠 High-level summary first:
 
 You're building a **smart contract** that:
 - Lets users create “zombies” with a name and random DNA.
