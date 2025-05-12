@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>MetaMask Signature Example</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.min.js"></script>
+  <style>
+    body {
+      background-color: #0a192f;  /* Dark blue background */
+      color: #64ffda;  /* Cyber mint text color */
+      font-family: 'Courier New', monospace;  /* Monospace font for tech feel */
+      padding: 20px;
+      line-height: 1.6;
+    }
+
+    h1, h2 {
+      color: #8892b0;  /* Light slate for headings */
+      border-bottom: 1px solid #233554;
+      padding-bottom: 10px;
+    }
+
+    input {
+      background-color: #112240;  /* Darker blue for input fields */
+      border: 1px solid #233554;
+      color: #64ffda;
+      padding: 8px;
+      border-radius: 4px;
+      margin: 5px 0;
+      font-family: 'Courier New', monospace;
+    }
+
+    button {
+      background-color: transparent;
+      border: 1px solid #64ffda;
+      color: #64ffda;
+      padding: 10px 20px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      transition: all 0.3s ease;
+    }
+
+    button:hover {
+      background-color: rgba(100, 255, 218, 0.1);
+    }
+
+    button:disabled {
+      border-color: #8892b0;
+      color: #8892b0;
+      cursor: not-allowed;
+    }
+
+    #walletSection {
+      background-color: #112240;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+      border: 1px solid #233554;
+    }
+
+    label {
+      display: inline-block;
+      width: 150px;
+      margin: 5px 0;
+    }
+
+    #result, #signatureInfo {
+      word-break: break-all;
+      background-color: #112240;
+      padding: 10px;
+      border-radius: 4px;
+      border: 1px solid #233554;
+    }
+  </style>
+</head>
+<body>
+  <h1>MetaMask Signature</h1>
+  
+  <!-- Wallet connection button and status display -->
+  <div id="walletSection">
+    <button id="connectWallet">Connect Wallet</button>
+    <p id="walletStatus">Wallet Status: Not Connected</p>
+    <p for="chainId">Chain ID:<input type="number" id="chainId" value="0" readonly></p>
+    <p for="walletAddress">Wallet Address:<input id="walletAddress" value="0x" readonly></p>
+  </div>
+
+  <h2>Signature Information</h2>
+  <label for="user">User Address:</label>
+  <input type="text" id="user" value="0x">
+  <br>
+  <label for="tokenId">Course NFT ID:</label>
+  <input type="text" id="tokenId" value="0">
+  <br>
+  <label for="progress">Course Progress:</label>
+  <input type="text" id="progress" value="0">
+  <br>
+
+  <button id="signButton">Sign</button>
+  <p id="signatureInfo"></p>
+
+  <script type="module">
+    import { ethers } from "https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.min.js";
+    
+    // Add wallet connection related variables
+    const connectWalletBtn = document.getElementById('connectWallet');
+    const walletStatus = document.getElementById('walletStatus');
+    const chainId = document.getElementById('chainId');
+    const walletAddress = document.getElementById('walletAddress');
+
+    const userInput = document.getElementById('user');
+    const tokenId = document.getElementById('tokenId');
+    const progressInput = document.getElementById('progress');
+
+    const signButton = document.getElementById('signButton');
+    const result = document.getElementById('result');
+    const signatureInfo = document.getElementById('signatureInfo');
+
+    // Check if MetaMask is installed
+    const checkIfWalletIsInstalled = () => {
+      if (typeof window.ethereum === 'undefined') {
+        alert('Please install MetaMask first!');
+        return false;
+      }
+      return true;
+    };
+
+    // Connect wallet function
+    const connectWallet = async () => {
+      if (!checkIfWalletIsInstalled()) return;
+      
+      try {
+        const accounts = await window.ethereum.request({ 
+          method: 'eth_requestAccounts' 
+        });
+        const account = accounts[0];
+        walletStatus.textContent = `Wallet Status: Connected`;
+        walletAddress.value = `${account}`;
+
+        // Get chain ID
+        const chainIdHex = await window.ethereum.request({ 
+          method: 'eth_chainId' 
+        });
+        const currentChainId = parseInt(chainIdHex, 16);
+        chainId.value = currentChainId;
+        
+        connectWalletBtn.textContent = 'Connected';
+        connectWalletBtn.disabled = true;
+      } catch (error) {
+        console.error(error);
+        walletStatus.textContent = 'Connection failed: ' + error.message;
+      }
+    };
+
+    // Listen for wallet account changes
+    if (window.ethereum) {
+      window.ethereum.on('accountsChanged', function (accounts) {
+        if (accounts.length === 0) {
+          // User disconnected
+          walletStatus.textContent = 'Wallet Status: Not Connected';
+          connectWalletBtn.textContent = 'Connect Wallet';
+          connectWalletBtn.disabled = false;
+          userInput.value = '0x';
+        } else {
+          // Update new account
+          const account = accounts[0];
+          walletStatus.textContent = `Wallet Status: Connected`;
+          walletAddress.value = `${account}`;
+        }
+      });
+
+      // Listen for chain changes
+      window.ethereum.on('chainChanged', function (chainId) {
+        const decimalChainId = parseInt(chainId, 16);
+        chainId.value = decimalChainId;
+      });
+    }
+
+    // Add wallet connection button click event
+    connectWalletBtn.addEventListener('click', connectWallet);
+
+    // Modify original window.onload function
+    window.onload = async () => {
+      if (!checkIfWalletIsInstalled()) return;
+      
+      try {
+        // Check if already authorized
+        const accounts = await window.ethereum.request({ 
+          method: 'eth_accounts' 
+        });
+        if (accounts.length > 0) {
+          const account = accounts[0];
+          walletStatus.textContent = `Wallet Status: Connected`;
+          walletAddress.value = `${account}`;
+          connectWalletBtn.textContent = 'Connected';
+          connectWalletBtn.disabled = true;
+
+          const chainIdHex = await window.ethereum.request({ 
+            method: 'eth_chainId' 
+          });
+          chainId.value = parseInt(chainIdHex, 16);
+        }
+      } catch (error) {
+        console.error(error);
+        chainId.textContent = 'Failed';
+      }
+    };
+
+    signButton.addEventListener('click', async () => {
+      try {
+        const messageHash = ethers.solidityPackedKeccak256(
+          ["address", "uint256", "uint8"],
+          [userInput.value, tokenId.value, progressInput.value]
+        );
+
+        const msgEthHash = ethers.getBytes(messageHash);
+        
+        // Request signature from MetaMask
+        const signature = await window.ethereum.request({
+          method: 'personal_sign',
+          params: [
+            ethers.hexlify(msgEthHash),
+            walletAddress.value  // Use the connected wallet address directly
+          ]
+        });
+
+        console.log('Signature:', signature);
+        signatureInfo.textContent = `Signature: ${signature}`;
+        
+      } catch (error) {
+        console.error(error);
+        result.textContent = 'Signature failed: ' + error.message;
+      }
+    });
+  </script>
+</body>
+</html>
