@@ -54,3 +54,4 @@ contract ZombieFeeding is ZombieFactory {
         feedAndMultiply(_zombieId, kittyDna, "kitty");
     }
 }
+// 4. Add a function to set the Kitty contract address
