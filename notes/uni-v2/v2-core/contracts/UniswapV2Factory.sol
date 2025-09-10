@@ -3,17 +3,25 @@ pragma solidity =0.5.16;
 import './interfaces/IUniswapV2Factory.sol';
 import './UniswapV2Pair.sol';
 
+// UniswapV2Factory is used to create pairs and track all pairs created
+// UniswapV2Factory also has a feeTo address which is used to receive protocol fees
+// The feeTo address can be set by the feeToSetter address
+// The feeToSetter address is initially set to the deployer address
+// The feeToSetter address can be changed by the current feeToSetter address
+
 contract UniswapV2Factory is IUniswapV2Factory {
     address public feeTo;
     address public feeToSetter;
 
-    mapping(address => mapping(address => address)) public getPair;
-    address[] public allPairs;
+    mapping(address => mapping(address => address)) public getPair; // tokenA -> tokenB -> pair
+    // NOTE: getPair[tokenA][tokenB] = pair address
+    // NOTE: getPair[tokenB][tokenA] = pair address
+    address[] public allPairs; // array of all pair addresses
 
-    event PairCreated(address indexed token0, address indexed token1, address pair, uint);
+    event PairCreated(address indexed token0, address indexed token1, address pair, uint); // indexed = filterable
 
     constructor(address _feeToSetter) public {
-        feeToSetter = _feeToSetter;
+        feeToSetter = _feeToSetter; // set feeToSetter to deployer address
     }
 
     function allPairsLength() external view returns (uint) {
@@ -30,7 +38,9 @@ contract UniswapV2Factory is IUniswapV2Factory {
         require(token0 != address(0), 'UniswapV2: ZERO_ADDRESS');
         require(getPair[token0][token1] == address(0), 'UniswapV2: PAIR_EXISTS'); // single check is sufficient
         // NOTE: creation code = runtime code + constructor args
-        bytes memory bytecode = type(UniswapV2Pair).creationCode;
+        // NOTE: deploy pair contract with create2 which allows to know in advance the address of the contract
+        bytes memory bytecode = type(UniswapV2Pair).creationCode; // get creation code
+        // NOTE: abi.encodePacked = concatenate in binary
         // NOTE: deploy with create2 - UniswapV2Library.pairFor
         // NOTE: create2 addr <- keccak256(creation bytecode) <- constructor args
         // create2 addr = keccak256(0xff, deployer, salt, keccak256(creation bytecode))

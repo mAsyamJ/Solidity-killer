@@ -47,6 +47,10 @@ contract UniswapV2LiquidityTest is Test {
         // Don’t change any other code
         vm.prank(user);
 
+        (,,) = router.addLiquidity({
+            
+        })
+
         assertGt(pair.balanceOf(user), 0, "LP = 0");
     }
 

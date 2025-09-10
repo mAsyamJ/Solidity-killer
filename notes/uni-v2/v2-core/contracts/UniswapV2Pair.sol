@@ -8,6 +8,14 @@ import './interfaces/IERC20.sol';
 import './interfaces/IUniswapV2Factory.sol';
 import './interfaces/IUniswapV2Callee.sol';
 
+// UniswapV2Pair is the core contract of the Uniswap V2 protocol
+// It is a liquidity pool that holds reserves of two ERC20 tokens
+// It allows users to swap between the two tokens, add liquidity, and remove liquidity
+// It also tracks the price of the two tokens using a time-weighted average price (TWAP) mechanism
+// The contract is initialized by the UniswapV2Factory contract which creates new pairs
+// The contract uses the UniswapV2ERC20 contract to manage liquidity tokens
+// The contract uses the UQ112x112 library to handle fixed point math for price calculations
+
 contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
     using SafeMath  for uint;
     using UQ112x112 for uint224;
@@ -119,24 +127,32 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
     }
 
     // this low-level function should be called from a contract which performs important safety checks
-    function mint(address to) external lock returns (uint liquidity) {
+    function mint(address to) external lock returns (uint liquidity) { // pool shares that are minted
         (uint112 _reserve0, uint112 _reserve1,) = getReserves(); // gas savings
-        uint balance0 = IERC20(token0).balanceOf(address(this));
+        uint balance0 = IERC20(token0).balanceOf(address(this)); 
         uint balance1 = IERC20(token1).balanceOf(address(this));
         // NOTE: amounts in calculated by taking differences from internal balances
-        uint amount0 = balance0.sub(_reserve0);
-        uint amount1 = balance1.sub(_reserve1);
+        uint amount0 = balance0.sub(_reserve0); // amount out of token0
+        uint amount1 = balance1.sub(_reserve1); // amount out of token1
 
-        bool feeOn = _mintFee(_reserve0, _reserve1);
+        bool feeOn = _mintFee(_reserve0, _reserve1); 
+
+        // totalSupply is for pool shares
         uint _totalSupply = totalSupply; // gas savings, must be defined here since totalSupply can update in _mintFee
         if (_totalSupply == 0) {
-            // NOTE: pool value function f(x, y) = sqrt(xy) = L
+            // NOTE: pool value function f(x, y) = sqrt(xy) = L = Shares first if there is no supply then it is equal to geometric mean of amounts
+            // NOTE: L = sqrt(xy)
             liquidity = Math.sqrt(amount0.mul(amount1)).sub(MINIMUM_LIQUIDITY);
-            // NOTE: protection against vault inflation attack
+            // NOTE: protection against vault inflation attack 
+            // example: if someone adds 1 wei of each token to the pool and mints a share
+            // they would be able to burn it later and take out a large portion of the pool
+            // so we permanently lock the first MINIMUM_LIQUIDITY tokens
            _mint(address(0), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens
         } else {
+            // This is for the case of small dx and dy and ignoring higher order terms to find shares to mint
             // NOTE: s = min(dx * T / x0, dy * T / y0)
-            liquidity = Math.min(amount0.mul(_totalSupply) / _reserve0, amount1.mul(_totalSupply) / _reserve1);
+            liquidity = Math.min(amount0.mul(_totalSupply) / _reserve0, 
+                                amount1.mul(_totalSupply) / _reserve1);
         }
         require(liquidity > 0, 'UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED');
         _mint(to, liquidity);

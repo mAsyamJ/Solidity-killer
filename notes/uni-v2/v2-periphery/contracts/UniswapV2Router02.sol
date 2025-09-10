@@ -9,6 +9,9 @@ import './libraries/SafeMath.sol';
 import './interfaces/IERC20.sol';
 import './interfaces/IWETH.sol';
 
+// NOTE: Feature:
+// 1. addLiquidity - add liquidity to a pool using two tokens and function quote to calculate dy and _addliquidty() funcion to check optimal amounts
+
 contract UniswapV2Router02 is IUniswapV2Router02 {
     using SafeMath for uint;
 
@@ -46,7 +49,7 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
         if (reserveA == 0 && reserveB == 0) {
             (amountA, amountB) = (amountADesired, amountBDesired);
         } else {
-            uint amountBOptimal = UniswapV2Library.quote(amountADesired, reserveA, reserveB);
+            uint amountBOptimal = UniswapV2Library.quote(amountADesired, reserveA, reserveB); // using quote to check dy
             if (amountBOptimal <= amountBDesired) {
                 require(amountBOptimal >= amountBMin, 'UniswapV2Router: INSUFFICIENT_B_AMOUNT');
                 (amountA, amountB) = (amountADesired, amountBOptimal);
@@ -56,6 +59,9 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
                 assert(amountAOptimal <= amountADesired);
                 require(amountAOptimal >= amountAMin, 'UniswapV2Router: INSUFFICIENT_A_AMOUNT');
                 (amountA, amountB) = (amountAOptimal, amountBDesired);
+
+                // NOTE: amountAOptimal = (amountBDesired * reserveA) / reserveB
+                // but what about amountBOptimal? If we dont check that, we might end up in a situation where users can ad liquidiy with INSUFFICIENT_B_AMOUNT : solved
             }
         }
     }
@@ -63,9 +69,9 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
     function addLiquidity(
         address tokenA,
         address tokenB,
-        uint amountADesired,
+        uint amountADesired, // from users
         uint amountBDesired,
-        uint amountAMin,
+        uint amountAMin, // minimum to succeed
         uint amountBMin,
         address to,
         uint deadline
@@ -75,7 +81,7 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
         // NOTE: trasfer of tokens before mint
         TransferHelper.safeTransferFrom(tokenA, msg.sender, pair, amountA);
         TransferHelper.safeTransferFrom(tokenB, msg.sender, pair, amountB);
-        liquidity = IUniswapV2Pair(pair).mint(to);
+        liquidity = IUniswapV2Pair(pair).mint(to); // return pool share minted
     }
     function addLiquidityETH(
         address token,
@@ -213,18 +219,29 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
 
     // **** SWAP ****
     // requires the initial amount to have already been sent to the first pair
-    function _swap(uint[] memory amounts, address[] memory path, address _to) internal virtual {
+    function _swap(
+        uint[] memory amounts, 
+        address[] memory path, 
+        address _to) 
+        internal virtual {
         // NOTE:
         //   i | path[i]   | path[i + 1]
         //   0 | path[0]   | path[1]
         //   1 | path[1]   | path[2]
         //   2 | path[2]   | path[3]
         // n-2 | path[n-2] | path[n-1]
+
+        // exp: If path = [DAI, USDC, WETH]
+        // Step 0 | DAI -> USDC
+        // Step 1 | USDC -> WETH
+        // Step 2 | WETH -> to
+        // NOTE: amounts[0] = input, amounts[last] = output, amounts[
         for (uint i; i < path.length - 1; i++) {
             (address input, address output) = (path[i], path[i + 1]);
             (address token0,) = UniswapV2Library.sortTokens(input, output);
             uint amountOut = amounts[i + 1];
-            (uint amount0Out, uint amount1Out) = input == token0 ? (uint(0), amountOut) : (amountOut, uint(0));
+            w
+            (uint amount0Out, uint amount1Out) = input == token0 ? (uint(0), amountOut) : (amountOut, uint(0)); // set output amount
             // NOTE: last swap -> send token out to "to" address
             //       otherwise -> send to next pair contract
             address to = i < path.length - 2 ? UniswapV2Library.pairFor(factory, output, path[i + 2]) : _to;
@@ -234,20 +251,21 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
             );
         }
     }
-    // NOTE: swap all input for max output
+    // NOTE: you provide input to know or swap all input for max output
     // in =  1000 DAI
     // out = max WETH
     function swapExactTokensForTokens(
-        uint amountIn,
-        uint amountOutMin,
-        address[] calldata path,
-        address to,
-        uint deadline
+        uint amountIn, // in
+        uint amountOutMin, // out
+        address[] calldata path, // array of tokens
+        address to, // to address
+        uint deadline // deadline for swap
     ) external virtual override ensure(deadline) returns (uint[] memory amounts) {
         // NOTE: calculates swap outputs
         // amounts[0] = input, amounts[last] = output, amounts[rest] = intermediate outputs
         amounts = UniswapV2Library.getAmountsOut(factory, amountIn, path);
         require(amounts[amounts.length - 1] >= amountOutMin, 'UniswapV2Router: INSUFFICIENT_OUTPUT_AMOUNT');
+        // NOTE: amounts[amounts.length - 1] is output amount
         // NOTE: create2 pair address
         // NOTE: directly send token in to pair
         TransferHelper.safeTransferFrom(
@@ -256,6 +274,8 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
         _swap(amounts, path, to);
     }
     // NOTE: swap min input for specified output
+    // you want exact output amount and willing to spend max input from your balances
+    // out =  1 WETH
     // max in = 3000 DAI
     // out =  1 WETH
     function swapTokensForExactTokens(
@@ -267,7 +287,9 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
     ) external virtual override ensure(deadline) returns (uint[] memory amounts) {
         // NOTE: calculates amount in
         amounts = UniswapV2Library.getAmountsIn(factory, amountOut, path);
-        require(amounts[0] <= amountInMax, 'UniswapV2Router: EXCESSIVE_INPUT_AMOUNT');
+        require(amounts[0] <= amountInMax, 'UniswapV2Router: EXCESSIVE_INPUT_AMOUNT'); // amount[0] because it's input amount are not decided by user and user are willing to pay anything to get that Exact token out
+        // NOTE: amounts[0] = required input.
+        // amountInMax = user’s upper bound (max they’re willing to spend).
         TransferHelper.safeTransferFrom(
             path[0], msg.sender, UniswapV2Library.pairFor(factory, path[0], path[1]), amounts[0]
         );

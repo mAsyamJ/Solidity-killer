@@ -27,7 +27,7 @@ contract UniswapV2FactoryTest is Test {
         // Exercise - deploy token + WETH pair contract
         // Write your code here
         // Don’t change any other code
-        address pair;
+        address pair = factory.createPair(address(token), WETH); // address of the pair contract
 
         address token0 = IUniswapV2Pair(pair).token0();
         address token1 = IUniswapV2Pair(pair).token1();
@@ -39,5 +39,9 @@ contract UniswapV2FactoryTest is Test {
             assertEq(token0, WETH, "token 0");
             assertEq(token1, address(token), "token 1");
         }
+
+        console2.log("pair address", pair);
+        console2.log("token0", token0);
+        console2.log("token1", token1);
     }
 }
